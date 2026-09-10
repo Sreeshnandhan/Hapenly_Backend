@@ -1,0 +1,333 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ORGANIZER
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum SeatHoldStatus {
+  ACTIVE
+  RELEASED
+  CONVERTED
+  EXPIRED
+}
+
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  phone        String?
+  passwordHash String
+  role         UserRole  @default(USER)
+
+  // Organizer's events
+  events       Event[]
+
+  // User's bookings
+  bookings     Booking[]
+
+  // User's reviews/comments
+  reviews      Review[]
+
+  // Temporary seat holds
+  seatHolds    SeatHold[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+
+// ─────────────────────────────────────────────
+// CATEGORY
+// ─────────────────────────────────────────────
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+
+  events      Event[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+
+// ─────────────────────────────────────────────
+// EVENT
+// ─────────────────────────────────────────────
+
+model Event {
+  id              Int          @id @default(autoincrement())
+
+  name            String
+  description     String
+
+  date            DateTime
+  startTime       String
+  duration        String
+
+  location        String
+  hostedBy        String
+  ageRequirement  String?
+
+  // Total capacity of the event
+  totalSeats      Int
+
+  // Seats currently available for booking
+  availableSeats  Int
+
+  // Single ticket price
+  ticketPrice     Decimal      @db.Decimal(10, 2)
+
+  // Admin approval workflow
+  status          EventStatus  @default(SUBMITTED)
+
+  // Organizer
+  organizerId     Int
+  organizer       User         @relation(fields: [organizerId], references: [id])
+
+  // Category
+  categoryId      Int
+  category        Category     @relation(fields: [categoryId], references: [id])
+
+  // Bookings
+  bookings        Booking[]
+
+  // Temporary seat holds
+  seatHolds       SeatHold[]
+
+  // Reviews/comments
+  reviews         Review[]
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@index([organizerId])
+  @@index([status])
+  @@index([date])
+}
+
+
+// ─────────────────────────────────────────────
+// BOOKING
+// ─────────────────────────────────────────────
+
+model Booking {
+  id             Int            @id @default(autoincrement())
+
+  // Number of tickets purchased
+  quantity       Int
+
+  // Price per ticket at the time of booking
+  ticketPrice    Decimal        @db.Decimal(10, 2)
+
+  // Platform fee
+  platformFee    Decimal        @db.Decimal(10, 2) @default(0)
+
+  // Final amount
+  totalAmount    Decimal        @db.Decimal(10, 2)
+
+  status         BookingStatus  @default(PENDING)
+
+  // User who booked
+  userId         Int
+  user           User           @relation(fields: [userId], references: [id])
+
+  // Event being booked
+  eventId        Int
+  event          Event          @relation(fields: [eventId], references: [id])
+
+  // Payment information
+  payment        Payment?
+
+  // Generated ticket
+  ticket         Ticket?
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([status])
+}
+
+
+// ─────────────────────────────────────────────
+// PAYMENT
+// ─────────────────────────────────────────────
+
+model Payment {
+  id                Int            @id @default(autoincrement())
+
+  // Amount paid
+  amount            Decimal        @db.Decimal(10, 2)
+
+  status            PaymentStatus  @default(PENDING)
+
+  // Razorpay details
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?        @unique
+
+  // One payment belongs to one booking
+  bookingId         Int            @unique
+  booking           Booking        @relation(
+    fields: [bookingId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+
+// ─────────────────────────────────────────────
+// SEAT HOLD
+// ─────────────────────────────────────────────
+
+model SeatHold {
+  id          Int             @id @default(autoincrement())
+
+  // Number of tickets temporarily held
+  quantity    Int
+
+  // Time until which the seats are held
+  expiresAt   DateTime
+
+  status      SeatHoldStatus  @default(ACTIVE)
+
+  // User holding the seats
+  userId      Int
+  user        User            @relation(
+    fields: [userId],
+    references: [id]
+  )
+
+  // Event
+  eventId     Int
+  event       Event           @relation(
+    fields: [eventId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([eventId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+
+// ─────────────────────────────────────────────
+// TICKET
+// ─────────────────────────────────────────────
+
+model Ticket {
+  id          Int       @id @default(autoincrement())
+
+  // Unique ticket identifier
+  ticketCode  String    @unique
+
+  // QR code data
+  qrCode      String
+
+  // Number of tickets represented by this booking
+  quantity    Int
+
+  // Booking associated with ticket
+  bookingId   Int       @unique
+  booking     Booking   @relation(
+    fields: [bookingId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ticketCode])
+}
+
+
+// ─────────────────────────────────────────────
+// REVIEW / COMMENT
+// ─────────────────────────────────────────────
+
+model Review {
+  id          Int       @id @default(autoincrement())
+
+  // Optional rating
+  rating      Int?
+
+  // Comment
+  comment     String
+
+  // User who posted the review
+  userId      Int
+  user        User      @relation(
+    fields: [userId],
+    references: [id]
+  )
+
+  // Event being reviewed
+  eventId     Int
+  event       Event     @relation(
+    fields: [eventId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([eventId])
+  @@index([userId])
+}
