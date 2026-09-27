@@ -215,11 +215,7 @@ model Payment {
 
   // One payment belongs to one booking
   bookingId         Int            @unique
-  booking           Booking        @relation(
-    fields: [bookingId],
-    references: [id],
-    onDelete: Cascade
-  )
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
@@ -243,18 +239,11 @@ model SeatHold {
 
   // User holding the seats
   userId      Int
-  user        User            @relation(
-    fields: [userId],
-    references: [id]
-  )
+user User @relation(fields: [userId], references: [id])
 
   // Event
   eventId     Int
-  event       Event           @relation(
-    fields: [eventId],
-    references: [id],
-    onDelete: Cascade
-  )
+ event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -284,11 +273,7 @@ model Ticket {
 
   // Booking associated with ticket
   bookingId   Int       @unique
-  booking     Booking   @relation(
-    fields: [bookingId],
-    references: [id],
-    onDelete: Cascade
-  )
+booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -312,18 +297,10 @@ model Review {
 
   // User who posted the review
   userId      Int
-  user        User      @relation(
-    fields: [userId],
-    references: [id]
-  )
-
+user User @relation(fields: [userId], references: [id])
   // Event being reviewed
   eventId     Int
-  event       Event     @relation(
-    fields: [eventId],
-    references: [id],
-    onDelete: Cascade
-  )
+ event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

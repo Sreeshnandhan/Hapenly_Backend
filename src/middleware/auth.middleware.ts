@@ -15,16 +15,15 @@ export function authenticate(
   next: NextFunction,
 ) {
   try {
-    const authHeader = req.headers.authorization;
+    // Get JWT from HttpOnly cookie
+    const token = req.cookies?.jwt;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "Authentication token is required",
       });
     }
-
-    const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: number;
