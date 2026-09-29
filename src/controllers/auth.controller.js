@@ -55,9 +55,11 @@ const isDatabaseUnavailable = (error) => {
     return false;
 };
 const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production"
+    ? ("none" as const)
+    : ("lax" as const),
 };
 // SIGNUP
 async function signup(req, res) {
