@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../config/env";
+import { getUserById } from "../services/auth.service";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -9,7 +10,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export function authenticate(
+export async function authenticate(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
@@ -28,11 +29,21 @@ export function authenticate(
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: number;
       role: "USER" | "ORGANIZER" | "ADMIN";
+      authVersion?: number;
     };
+
+    const user = await getUserById(decoded.userId, decoded.authVersion ?? 0);
+    if (!user)
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: "Session expired. Please sign in again.",
+        });
 
     req.user = {
       userId: decoded.userId,
-      role: decoded.role,
+      role: user.role,
     };
 
     next();

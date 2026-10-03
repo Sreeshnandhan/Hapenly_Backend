@@ -15,9 +15,7 @@ export async function signup(data: SignupInput) {
   const { name, email, password, phone, role = "USER" } = data;
 
   const existingUser = await prisma.user.findUnique({
-    where: {
-      email,
-    },
+    where: { email },
   });
 
   if (existingUser) {
@@ -54,9 +52,7 @@ export async function login(data: LoginInput) {
   const { email, password } = data;
 
   const user = await prisma.user.findUnique({
-    where: {
-      email,
-    },
+    where: { email },
   });
 
   if (!user) {
@@ -73,6 +69,7 @@ export async function login(data: LoginInput) {
     {
       userId: user.id,
       role: user.role,
+      authVersion: user.authVersion,
     },
     JWT_SECRET,
     {
@@ -92,15 +89,20 @@ export async function login(data: LoginInput) {
   };
 }
 
-export async function getUserById(userId: string | number) {
-  const numericId = typeof userId === "string" ? parseInt(userId, 10) : userId;
-  if (isNaN(numericId)) return null;
+export async function getUserById(userId: string | number, authVersion = 0) {
+  const numericId = typeof userId === "string" ? Number(userId) : userId;
+
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return null;
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: numericId },
   });
 
-  if (!user) return null;
+  if (!user || user.authVersion !== authVersion) {
+    return null;
+  }
 
   return {
     id: user.id,

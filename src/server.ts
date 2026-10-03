@@ -8,6 +8,12 @@ import { PORT, FRONTEND_URL } from "./config/env";
 
 const app = express();
 
+// Set only to the verified number of reverse proxies in your deployment.
+const proxyHops = Number(process.env.TRUST_PROXY_HOPS || "0");
+if (!Number.isInteger(proxyHops) || proxyHops < 0)
+  throw new Error("Invalid TRUST_PROXY_HOPS");
+if (proxyHops > 0) app.set("trust proxy", proxyHops);
+
 const allowedOrigins = [
   FRONTEND_URL,
   "http://localhost:8443",

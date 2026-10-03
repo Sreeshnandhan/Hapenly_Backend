@@ -61,6 +61,10 @@ model User {
   email        String    @unique
   phone        String?
   passwordHash String
+  authVersion  Int       @default(0)
+  passwordResetTokenHash String? @unique
+  passwordResetExpiresAt DateTime?
+  passwordResetRequestedAt DateTime?
   role         UserRole  @default(USER)
 
   // Organizer's events
