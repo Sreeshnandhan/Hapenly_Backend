@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response, CookieOptions } from "express";
 import * as authService from "../services/auth.service";
 import { Prisma } from "@prisma/client";
 import jwt from "jsonwebtoken";
@@ -16,16 +16,17 @@ const isDatabaseUnavailable = (error: unknown): boolean => {
   return false;
 };
 
-const cookieOptions = {
+const cookieOptions: CookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  path: "/",
 };
 
 // SIGNUP
 export async function signup(req: Request, res: Response) {
   try {
-    const { name, email, password, phone, role } = req.body;
+    const { name, email, password, phone, role } = req.body ?? {};
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -55,7 +56,6 @@ export async function signup(req: Request, res: Response) {
       user,
     });
   } catch (error) {
-    // Actual error appears only in your backend logs.
     console.error("Signup failed:", error);
 
     if (isDatabaseUnavailable(error)) {
@@ -67,18 +67,10 @@ export async function signup(req: Request, res: Response) {
     }
 
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return res.status(409).json({
-        success: false,
-        message: "This email is already registered. Please sign in.",
-      });
-    }
-
-    if (
-      error instanceof Error &&
-      error.message === "Email is already registered"
+      (error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002") ||
+      (error instanceof Error &&
+        error.message === "Email is already registered")
     ) {
       return res.status(409).json({
         success: false,
@@ -97,7 +89,7 @@ export async function signup(req: Request, res: Response) {
 // LOGIN
 export async function login(req: Request, res: Response) {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body ?? {};
 
     if (!email || !password) {
       return res.status(400).json({
@@ -170,11 +162,32 @@ export async function me(req: Request, res: Response) {
     });
   }
 
-  let payload: { userId: string | number };
+  let payload: {
+    userId: string | number;
+    authVersion?: number;
+  };
 
   try {
-    payload = jwt.verify(token, JWT_SECRET) as {
-      userId: string | number;
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (
+      typeof decoded === "string" ||
+      (typeof decoded.userId !== "string" &&
+        typeof decoded.userId !== "number") ||
+      (decoded.authVersion !== undefined &&
+        (typeof decoded.authVersion !== "number" ||
+          !Number.isInteger(decoded.authVersion) ||
+          decoded.authVersion < 0))
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid session. Please sign in again.",
+      });
+    }
+
+    payload = {
+      userId: decoded.userId,
+      authVersion: decoded.authVersion,
     };
   } catch {
     return res.status(401).json({
@@ -184,7 +197,10 @@ export async function me(req: Request, res: Response) {
   }
 
   try {
-    const user = await authService.getUserById(payload.userId);
+    const user = await authService.getUserById(
+      payload.userId,
+      payload.authVersion ?? 0,
+    );
 
     if (!user) {
       return res.status(401).json({
