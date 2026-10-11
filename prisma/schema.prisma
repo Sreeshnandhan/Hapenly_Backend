@@ -125,7 +125,7 @@ model Event {
   availableSeats  Int
 
   // Single ticket price
-  ticketPrice     Decimal      @db.Decimal(10, 2)
+ticketPrice Decimal? @db.Decimal(10, 2)
 
   // Admin approval workflow
   status          EventStatus  @default(SUBMITTED)
@@ -146,6 +146,11 @@ model Event {
 
   // Reviews/comments
   reviews         Review[]
+
+imageUrl       String?
+imagePublicId  String?
+organizerName  String?
+organizerPhone String?
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
